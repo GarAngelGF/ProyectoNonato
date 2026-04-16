@@ -6,7 +6,6 @@ using ProyectoNonato.Utilidades;
 
 namespace ProyectoNonato.Controllers
 {
-    // Restricción: Solo el Administrador puede gestionar el catálogo de materias
     [Authorize(Roles = "Admin")]
     public class MateriasController : Controller
     {
@@ -40,8 +39,6 @@ namespace ProyectoNonato.Controllers
 
                 SqlCommand cmd = new SqlCommand(query, cn);
                 cmd.Parameters.AddWithValue("@nombre", nombreMateria);
-
-                // Manejo de valores nulos si no se especifican el área o el nivel
                 cmd.Parameters.AddWithValue("@area", string.IsNullOrEmpty(area) ? DBNull.Value : area);
                 cmd.Parameters.AddWithValue("@nivel", string.IsNullOrEmpty(nivelAplicable) ? DBNull.Value : nivelAplicable);
 
@@ -72,3 +69,13 @@ namespace ProyectoNonato.Controllers
             using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
             {
                 string query = "DELETE FROM MATERIAS WHERE NombreMateria = @nombre";
+                SqlCommand cmd = new SqlCommand(query, cn);
+                cmd.Parameters.AddWithValue("@nombre", nombreMateria);
+
+                cn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            return RedirectToAction("Index");
+        }
+    }
+}
