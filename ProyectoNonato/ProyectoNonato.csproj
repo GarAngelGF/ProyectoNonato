@@ -6,4 +6,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Views\Alumnos\" />
+    <Folder Include="Views\Inscripciones\" />
+    <Folder Include="Views\Boletas\" />
+    <Folder Include="Views\DetalleBoleta\" />
+    <Folder Include="Views\Materias\" />
+    <Folder Include="Views\Horarios\" />
+    <Folder Include="Views\Grupos\" />
+    <Folder Include="Views\Profesores\" />
+    <Folder Include="Views\Tutores\" />
+  </ItemGroup>
+
 </Project>
