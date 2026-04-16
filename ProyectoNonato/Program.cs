@@ -1,4 +1,13 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Configurar Autenticación
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(option => {
+        option.LoginPath = "/Home/Index";
+        option.AccessDeniedPath = "/Home/Index"; // O una vista de "No tienes permiso"
+    });
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -16,6 +25,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
