@@ -56,4 +56,68 @@
         </div>
     }
 
+    <!-- Secciones Adicionales Visibles para Admin -->
+    @if (User.IsInRole("Admin"))
+    {
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Materias</h5>
+                    <p class="card-text">Gestión de materias.</p>
+                    <a asp-controller="Materias" asp-action="Index" class="btn btn-info text-white">Ir a Materias</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Tutores</h5>
+                    <p class="card-text">Gestión de tutores asignados.</p>
+                    <a asp-controller="Tutores" asp-action="Index" class="btn btn-info text-white">Ir a Tutores</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Inscripciones</h5>
+                    <p class="card-text">Gestión de inscripciones a grupos.</p>
+                    <a asp-controller="Inscripciones" asp-action="Index" class="btn btn-info text-white">Ir a Inscripciones</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Horarios</h5>
+                    <p class="card-text">Gestión de horarios de clases.</p>
+                    <a asp-controller="Horarios" asp-action="Index" class="btn btn-info text-white">Ir a Horarios</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Boletas</h5>
+                    <p class="card-text">Gestión de boletas de calificaciones.</p>
+                    <a asp-controller="Boletas" asp-action="Index" class="btn btn-info text-white">Ir a Boletas</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Detalle Boleta</h5>
+                    <p class="card-text">Gestión de detalles de cada boleta.</p>
+                    <a asp-controller="DetalleBoleta" asp-action="Index" class="btn btn-info text-white">Ir a Detalle</a>
+                </div>
+            </div>
+        </div>
+    }
+
 </div>
