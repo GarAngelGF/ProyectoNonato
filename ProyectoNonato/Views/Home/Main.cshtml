@@ -3,3 +3,57 @@
 *@
 @{
 }
+@{
+    ViewData["Title"] = "Panel Principal";
+}
+
+<div class="text-center mt-5">
+    <h1 class="display-4">Bienvenido, @User.Identity.Name</h1>
+    <p class="lead">Selecciona una de las secciones a las que tienes acceso.</p>
+</div>
+
+<div class="row mt-4 justify-content-center">
+
+    <!-- Visible para Admin -->
+    @if (User.IsInRole("Admin"))
+    {
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Alumnos</h5>
+                    <p class="card-text">Gestión total de los alumnos del sistema.</p>
+                    <a asp-controller="Alumnos" asp-action="Index" class="btn btn-primary">Ir a Alumnos</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Visible para Admin y Consultor -->
+    @if (User.IsInRole("Admin") || User.IsInRole("Consultor"))
+    {
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Grupos</h5>
+                    <p class="card-text">Consulta y gestión de grupos.</p>
+                    <a asp-controller="Grupos" asp-action="Index" class="btn btn-success">Ir a Grupos</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Visible para Admin y Gestor -->
+    @if (User.IsInRole("Admin") || User.IsInRole("Gestor"))
+    {
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Profesores</h5>
+                    <p class="card-text">Consulta y gestión de profesores.</p>
+                    <a asp-controller="Profesores" asp-action="Index" class="btn btn-warning">Ir a Profesores</a>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
