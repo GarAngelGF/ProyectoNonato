@@ -11,15 +11,29 @@ namespace ProyectoNonato.Controllers
     [Authorize(Roles = "Admin")]
     public class TutoresController : Controller
     {
+        private string GetConnectionString()
+        {
+            var user = User.Identity?.Name ?? "";
+            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
+            return Conexion.GenerarCadenaDinamica(user, pass);
+        }
+
         // 1. LISTADO DE TUTORES
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM TUTORES";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM TUTORES";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información de tutores. Verifique sus permisos.";
             }
             return View(dt);
         }
@@ -34,32 +48,40 @@ namespace ProyectoNonato.Controllers
         [HttpPost]
         public IActionResult Create(string idOficial, string nombre, string apPaterno, string apMaterno, string parentesco, string telefono, string calle, string numero, string colonia, string alcaldia, string cp, string lugarTrabajo, string telTrabajo)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = @"INSERT INTO TUTORES (IdentificacionOficial, Nombre, ApellidoPaterno, ApellidoMaterno, Parentesco, Telefono, Calle, Numero, Colonia, Alcaldia, CodigoPostal, LugarTrabajo, TelefonoTrabajo) 
-                                 VALUES (@id, @nom, @pat, @mat, @par, @tel, @calle, @num, @col, @alc, @cp, @trab, @telTrab)";
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = @"INSERT INTO TUTORES (IdentificacionOficial, Nombre, ApellidoPaterno, ApellidoMaterno, Parentesco, Telefono, Calle, Numero, Colonia, Alcaldia, CodigoPostal, LugarTrabajo, TelefonoTrabajo) 
+                                     VALUES (@id, @nom, @pat, @mat, @par, @tel, @calle, @num, @col, @alc, @cp, @trab, @telTrab)";
 
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@id", idOficial);
-                cmd.Parameters.AddWithValue("@nom", nombre);
-                cmd.Parameters.AddWithValue("@pat", apPaterno);
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@id", idOficial);
+                    cmd.Parameters.AddWithValue("@nom", nombre);
+                    cmd.Parameters.AddWithValue("@pat", apPaterno);
 
-                // Manejo de valores opcionales para evitar errores en Azure SQL
-                cmd.Parameters.AddWithValue("@mat", string.IsNullOrEmpty(apMaterno) ? DBNull.Value : apMaterno);
-                cmd.Parameters.AddWithValue("@par", string.IsNullOrEmpty(parentesco) ? DBNull.Value : parentesco);
-                cmd.Parameters.AddWithValue("@tel", string.IsNullOrEmpty(telefono) ? DBNull.Value : telefono);
-                cmd.Parameters.AddWithValue("@calle", string.IsNullOrEmpty(calle) ? DBNull.Value : calle);
-                cmd.Parameters.AddWithValue("@num", string.IsNullOrEmpty(numero) ? DBNull.Value : numero);
-                cmd.Parameters.AddWithValue("@col", string.IsNullOrEmpty(colonia) ? DBNull.Value : colonia);
-                cmd.Parameters.AddWithValue("@alc", string.IsNullOrEmpty(alcaldia) ? DBNull.Value : alcaldia);
-                cmd.Parameters.AddWithValue("@cp", string.IsNullOrEmpty(cp) ? DBNull.Value : cp);
-                cmd.Parameters.AddWithValue("@trab", string.IsNullOrEmpty(lugarTrabajo) ? DBNull.Value : lugarTrabajo);
-                cmd.Parameters.AddWithValue("@telTrab", string.IsNullOrEmpty(telTrabajo) ? DBNull.Value : telTrabajo);
+                    // Manejo de valores opcionales para evitar errores en Azure SQL
+                    cmd.Parameters.AddWithValue("@mat", string.IsNullOrEmpty(apMaterno) ? DBNull.Value : (object)apMaterno);
+                    cmd.Parameters.AddWithValue("@par", string.IsNullOrEmpty(parentesco) ? DBNull.Value : (object)parentesco);
+                    cmd.Parameters.AddWithValue("@tel", string.IsNullOrEmpty(telefono) ? DBNull.Value : (object)telefono);
+                    cmd.Parameters.AddWithValue("@calle", string.IsNullOrEmpty(calle) ? DBNull.Value : (object)calle);
+                    cmd.Parameters.AddWithValue("@num", string.IsNullOrEmpty(numero) ? DBNull.Value : (object)numero);
+                    cmd.Parameters.AddWithValue("@col", string.IsNullOrEmpty(colonia) ? DBNull.Value : (object)colonia);
+                    cmd.Parameters.AddWithValue("@alc", string.IsNullOrEmpty(alcaldia) ? DBNull.Value : (object)alcaldia);
+                    cmd.Parameters.AddWithValue("@cp", string.IsNullOrEmpty(cp) ? DBNull.Value : (object)cp);
+                    cmd.Parameters.AddWithValue("@trab", string.IsNullOrEmpty(lugarTrabajo) ? DBNull.Value : (object)lugarTrabajo);
+                    cmd.Parameters.AddWithValue("@telTrab", string.IsNullOrEmpty(telTrabajo) ? DBNull.Value : (object)telTrabajo);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para crear tutores.";
+                return View();
+            }
         }
 
         // 4. ACTUALIZAR TUTOR (GET)
@@ -67,12 +89,19 @@ namespace ProyectoNonato.Controllers
         public IActionResult Update(string id)
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM TUTORES WHERE IdentificacionOficial = @id";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.SelectCommand.Parameters.AddWithValue("@id", id);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM TUTORES WHERE IdentificacionOficial = @id";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.SelectCommand.Parameters.AddWithValue("@id", id);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información del tutor.";
             }
             return View(dt);
         }
@@ -82,7 +111,7 @@ namespace ProyectoNonato.Controllers
         {
             try
             {
-                using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
                     string query = "DELETE FROM TUTORES WHERE IdentificacionOficial = @id";
                     SqlCommand cmd = new SqlCommand(query, cn);
@@ -93,8 +122,8 @@ namespace ProyectoNonato.Controllers
             }
             catch (SqlException ex)
             {
-                // Manejo de error si el tutor tiene alumnos asignados (Integridad Referencial)
-                ViewBag.Error = "No se puede eliminar el tutor porque tiene alumnos asociados.";
+                // Manejo de error si el tutor tiene alumnos asignados (Integridad Referencial o permisos)
+                ViewBag.Error = "No se puede eliminar el tutor porque tiene alumnos asociados o falta de permisos.";
                 return RedirectToAction("Index");
             }
             return RedirectToAction("Index");

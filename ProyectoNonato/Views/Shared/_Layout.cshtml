@@ -28,6 +28,25 @@
                         </li>
                         @if (User.Identity.IsAuthenticated)
                         {
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Alumnos" asp-action="Index">Alumnos</a>
+                                </li>
+                            }
+                            @if (User.IsInRole("Admin") || User.IsInRole("Gestor"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Profesores" asp-action="Index">Profesores</a>
+                                </li>
+                            }
+                            @if (User.IsInRole("Admin") || User.IsInRole("Consultor"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Grupos" asp-action="Index">Grupos</a>
+                                </li>
+                            }
+
                             <li class="nav-item">
                                 <a class="nav-link text-danger fw-bold" asp-area="" asp-controller="Home" asp-action="Salir">
                                     Cerrar Sesión (@User.Identity.Name)

@@ -10,16 +10,30 @@ namespace ProyectoNonato.Controllers
     [Authorize(Roles = "Admin,Consultor")]
     public class GruposController : Controller
     {
+        private string GetConnectionString()
+        {
+            var user = User.Identity?.Name ?? "";
+            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
+            return Conexion.GenerarCadenaDinamica(user, pass);
+        }
+
         // 1. LISTADO DE GRUPOS
         // Accesible para el administrador y el usuario que solo consulta grupos
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM GRUPOS";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM GRUPOS";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información de grupos. Verifique sus permisos.";
             }
             return View(dt);
         }
@@ -37,18 +51,26 @@ namespace ProyectoNonato.Controllers
         [HttpPost]
         public IActionResult Create(string nombreGrupo, string nivel, int capacidad)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "INSERT INTO GRUPOS (NombreGrupo, Nivel, CapacidadMaxima) VALUES (@nombre, @nivel, @capacidad)";
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@nombre", nombreGrupo);
-                cmd.Parameters.AddWithValue("@nivel", nivel);
-                cmd.Parameters.AddWithValue("@capacidad", capacidad);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "INSERT INTO GRUPOS (NombreGrupo, Nivel, CapacidadMaxima) VALUES (@nombre, @nivel, @capacidad)";
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@nombre", nombreGrupo);
+                    cmd.Parameters.AddWithValue("@nivel", nivel);
+                    cmd.Parameters.AddWithValue("@capacidad", capacidad);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para crear grupos.";
+                return View();
+            }
         }
 
         // 4. ACTUALIZAR GRUPO (GET)
@@ -57,13 +79,20 @@ namespace ProyectoNonato.Controllers
         public IActionResult Update(string nombre, string nivel)
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM GRUPOS WHERE NombreGrupo = @nombre AND Nivel = @nivel";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.SelectCommand.Parameters.AddWithValue("@nombre", nombre);
-                da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM GRUPOS WHERE NombreGrupo = @nombre AND Nivel = @nivel";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.SelectCommand.Parameters.AddWithValue("@nombre", nombre);
+                    da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información del grupo.";
             }
             return View(dt);
         }
@@ -72,17 +101,25 @@ namespace ProyectoNonato.Controllers
         [Authorize(Roles = "Admin")]
         public IActionResult Delete(string nombre, string nivel)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "DELETE FROM GRUPOS WHERE NombreGrupo = @nombre AND Nivel = @nivel";
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
-                cmd.Parameters.AddWithValue("@nivel", nivel);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "DELETE FROM GRUPOS WHERE NombreGrupo = @nombre AND Nivel = @nivel";
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@nombre", nombre);
+                    cmd.Parameters.AddWithValue("@nivel", nivel);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para eliminar grupos.";
+                return RedirectToAction("Index");
+            }
         }
     }
 }

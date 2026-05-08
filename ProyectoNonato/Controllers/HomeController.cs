@@ -28,25 +28,34 @@ namespace ProyectoNonato.Controllers
                 return View();
             }
 
-            // 1. Construimos dinámicamente la cadena de conexión basándonos en tu Conexion.cs
-            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(Conexion.CadenaSQL)
-            {
-                UserID = usuario,
-                Password = password
-            };
+            // 1. Construimos dinámicamente la cadena de conexión
+            string cadenaConexion = Utilidades.Conexion.GenerarCadenaDinamica(usuario, password);
 
             bool credencialesValidas = false;
+            string rol = "Usuario";
 
             // 2. Intentamos conectar a la base de datos con esas credenciales
             try
             {
-                using (SqlConnection conn = new SqlConnection(builder.ConnectionString))
+                using (SqlConnection conn = new SqlConnection(cadenaConexion))
                 {
                     await conn.OpenAsync();
                     credencialesValidas = true; 
+
+                    // Consulta de rol de forma dinámica en la base de datos
+                    using (SqlCommand cmd = new SqlCommand("SELECT RolApp FROM AppRoles WHERE NombreUsuario = @usuario", conn))
+                    {
+                        cmd.Parameters.Add(new SqlParameter("@usuario", usuario));
+
+                        var result = await cmd.ExecuteScalarAsync();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            rol = result.ToString();
+                        }
+                    }
                 }
             }
-            catch (SqlException)
+            catch (SqlException ex)
             {
                 ViewBag.Error = "Credenciales incorrectas o acceso denegado por la base de datos";
                 return View();
@@ -55,17 +64,10 @@ namespace ProyectoNonato.Controllers
             // 3. Si es válido, asignamos el rol en la aplicación web
             if (credencialesValidas)
             {
-                string rol = "Usuario";
-                if (usuario.Equals("AdminProyecto", StringComparison.OrdinalIgnoreCase))
-                    rol = "Admin";
-                else if (usuario.Equals("ConsultorGrupos", StringComparison.OrdinalIgnoreCase))
-                    rol = "Consultor";
-                else if (usuario.Equals("GestorProfesores", StringComparison.OrdinalIgnoreCase))
-                    rol = "Gestor";
-
                 var claims = new List<Claim> {
                     new Claim(ClaimTypes.Name, usuario),
-                    new Claim(ClaimTypes.Role, rol)
+                    new Claim(ClaimTypes.Role, rol),
+                    new Claim("UserPass", password) // Guardamos el password temporalmente (ver consideraciones de seguridad)
                 };
 
                 var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

@@ -11,15 +11,29 @@ namespace ProyectoNonato.Controllers
     [Authorize(Roles = "Admin,Gestor")]
     public class ProfesoresController : Controller
     {
+        private string GetConnectionString()
+        {
+            var user = User.Identity?.Name ?? "";
+            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
+            return Conexion.GenerarCadenaDinamica(user, pass);
+        }
+
         // 1. LISTADO DE PROFESORES
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM PROFESORES";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM PROFESORES";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información de profesores. Verifique sus permisos.";
             }
             return View(dt);
         }
@@ -34,34 +48,42 @@ namespace ProyectoNonato.Controllers
         [HttpPost]
         public IActionResult Create(string cedula, string nombre, string apPaterno, string apMaterno, string telefono, string calle, string numero, string colonia, string alcaldia, string cp, DateTime fechaIngreso, int horasBase, string estatus)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = @"INSERT INTO PROFESORES (CedulaProfesional, Nombre, ApellidoPaterno, ApellidoMaterno, Telefono, Calle, Numero, Colonia, Alcaldia, CodigoPostal, FechaIngreso, HorasBase, Estatus) 
-                                 VALUES (@cedula, @nombre, @apPaterno, @apMaterno, @tel, @calle, @num, @col, @alc, @cp, @fecha, @horas, @estatus)";
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = @"INSERT INTO PROFESORES (CedulaProfesional, Nombre, ApellidoPaterno, ApellidoMaterno, Telefono, Calle, Numero, Colonia, Alcaldia, CodigoPostal, FechaIngreso, HorasBase, Estatus) 
+                                     VALUES (@cedula, @nombre, @apPaterno, @apMaterno, @tel, @calle, @num, @col, @alc, @cp, @fecha, @horas, @estatus)";
 
-                SqlCommand cmd = new SqlCommand(query, cn);
+                    SqlCommand cmd = new SqlCommand(query, cn);
 
-                // Campos obligatorios
-                cmd.Parameters.AddWithValue("@cedula", cedula);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
-                cmd.Parameters.AddWithValue("@apPaterno", apPaterno);
+                    // Campos obligatorios
+                    cmd.Parameters.AddWithValue("@cedula", cedula);
+                    cmd.Parameters.AddWithValue("@nombre", nombre);
+                    cmd.Parameters.AddWithValue("@apPaterno", apPaterno);
 
-                // Campos opcionales (Manejo de nulos para Azure SQL)
-                cmd.Parameters.AddWithValue("@apMaterno", string.IsNullOrEmpty(apMaterno) ? DBNull.Value : apMaterno);
-                cmd.Parameters.AddWithValue("@tel", string.IsNullOrEmpty(telefono) ? DBNull.Value : telefono);
-                cmd.Parameters.AddWithValue("@calle", string.IsNullOrEmpty(calle) ? DBNull.Value : calle);
-                cmd.Parameters.AddWithValue("@num", string.IsNullOrEmpty(numero) ? DBNull.Value : numero);
-                cmd.Parameters.AddWithValue("@col", string.IsNullOrEmpty(colonia) ? DBNull.Value : colonia);
-                cmd.Parameters.AddWithValue("@alc", string.IsNullOrEmpty(alcaldia) ? DBNull.Value : alcaldia);
-                cmd.Parameters.AddWithValue("@cp", string.IsNullOrEmpty(cp) ? DBNull.Value : cp);
-                cmd.Parameters.AddWithValue("@fecha", fechaIngreso == default(DateTime) ? DBNull.Value : fechaIngreso);
-                cmd.Parameters.AddWithValue("@horas", horasBase);
-                cmd.Parameters.AddWithValue("@estatus", string.IsNullOrEmpty(estatus) ? "Activo" : estatus);
+                    // Campos opcionales (Manejo de nulos para Azure SQL)
+                    cmd.Parameters.AddWithValue("@apMaterno", string.IsNullOrEmpty(apMaterno) ? DBNull.Value : apMaterno);
+                    cmd.Parameters.AddWithValue("@tel", string.IsNullOrEmpty(telefono) ? DBNull.Value : telefono);
+                    cmd.Parameters.AddWithValue("@calle", string.IsNullOrEmpty(calle) ? DBNull.Value : calle);
+                    cmd.Parameters.AddWithValue("@num", string.IsNullOrEmpty(numero) ? DBNull.Value : numero);
+                    cmd.Parameters.AddWithValue("@col", string.IsNullOrEmpty(colonia) ? DBNull.Value : colonia);
+                    cmd.Parameters.AddWithValue("@alc", string.IsNullOrEmpty(alcaldia) ? DBNull.Value : alcaldia);
+                    cmd.Parameters.AddWithValue("@cp", string.IsNullOrEmpty(cp) ? DBNull.Value : cp);
+                    cmd.Parameters.AddWithValue("@fecha", fechaIngreso == default(DateTime) ? DBNull.Value : fechaIngreso);
+                    cmd.Parameters.AddWithValue("@horas", horasBase);
+                    cmd.Parameters.AddWithValue("@estatus", string.IsNullOrEmpty(estatus) ? "Activo" : estatus);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para crear profesores.";
+                return View();
+            }
         }
 
         // 4. ACTUALIZAR PROFESOR (GET)
@@ -69,12 +91,19 @@ namespace ProyectoNonato.Controllers
         public IActionResult Update(string cedula)
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "SELECT * FROM PROFESORES WHERE CedulaProfesional = @cedula";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.SelectCommand.Parameters.AddWithValue("@cedula", cedula);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "SELECT * FROM PROFESORES WHERE CedulaProfesional = @cedula";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.SelectCommand.Parameters.AddWithValue("@cedula", cedula);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información del profesor.";
             }
             return View(dt);
         }
@@ -82,16 +111,24 @@ namespace ProyectoNonato.Controllers
         // 5. ELIMINAR PROFESOR
         public IActionResult Delete(string cedula)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = "DELETE FROM PROFESORES WHERE CedulaProfesional = @cedula";
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@cedula", cedula);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = "DELETE FROM PROFESORES WHERE CedulaProfesional = @cedula";
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@cedula", cedula);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para eliminar profesores.";
+                return RedirectToAction("Index");
+            }
         }
     }
 }

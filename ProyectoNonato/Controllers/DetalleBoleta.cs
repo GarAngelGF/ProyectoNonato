@@ -11,16 +11,30 @@ namespace ProyectoNonato.Controllers
     [Authorize(Roles = "Admin")]
     public class DetalleBoletaController : Controller
     {
+        private string GetConnectionString()
+        {
+            var user = User.Identity?.Name ?? "";
+            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
+            return Conexion.GenerarCadenaDinamica(user, pass);
+        }
+
         // 1. LISTADO GENERAL
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                // Consulta que trae el detalle y el nombre de la materia para mejor visualización
-                string query = "SELECT * FROM DETALLE_BOLETA";
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.Fill(dt);
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    // Consulta que trae el detalle y el nombre de la materia para mejor visualización
+                    string query = "SELECT * FROM DETALLE_BOLETA";
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la información de detalle de boletas. Verifique sus permisos.";
             }
             return View(dt);
         }
@@ -35,24 +49,32 @@ namespace ProyectoNonato.Controllers
         [HttpPost]
         public IActionResult Create(int boleta, string nombreGrupo, string nivel, string ciclo, string nombreMateria, decimal calificacion, string observaciones)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = @"INSERT INTO DETALLE_BOLETA (Boleta, NombreGrupo, Nivel, Ciclo, NombreMateria, Calificacion, ObservacionesMateria) 
-                                 VALUES (@boleta, @grupo, @nivel, @ciclo, @materia, @calif, @obs)";
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = @"INSERT INTO DETALLE_BOLETA (Boleta, NombreGrupo, Nivel, Ciclo, NombreMateria, Calificacion, ObservacionesMateria) 
+                                     VALUES (@boleta, @grupo, @nivel, @ciclo, @materia, @calif, @obs)";
 
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@boleta", boleta);
-                cmd.Parameters.AddWithValue("@grupo", nombreGrupo);
-                cmd.Parameters.AddWithValue("@nivel", nivel);
-                cmd.Parameters.AddWithValue("@ciclo", ciclo);
-                cmd.Parameters.AddWithValue("@materia", nombreMateria);
-                cmd.Parameters.AddWithValue("@calif", calificacion);
-                cmd.Parameters.AddWithValue("@obs", string.IsNullOrEmpty(observaciones) ? DBNull.Value : observaciones);
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@boleta", boleta);
+                    cmd.Parameters.AddWithValue("@grupo", nombreGrupo);
+                    cmd.Parameters.AddWithValue("@nivel", nivel);
+                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
+                    cmd.Parameters.AddWithValue("@materia", nombreMateria);
+                    cmd.Parameters.AddWithValue("@calif", calificacion);
+                    cmd.Parameters.AddWithValue("@obs", string.IsNullOrEmpty(observaciones) ? DBNull.Value : (object)observaciones);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para crear calificaciones.";
+                return View();
+            }
         }
 
         // 4. ACTUALIZAR CALIFICACIÓN (GET)
@@ -60,19 +82,26 @@ namespace ProyectoNonato.Controllers
         public IActionResult Update(int boleta, string grupo, string nivel, string ciclo, string materia)
         {
             DataTable dt = new DataTable();
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = @"SELECT * FROM DETALLE_BOLETA 
-                                 WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
-                                 AND Ciclo = @ciclo AND NombreMateria = @materia";
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = @"SELECT * FROM DETALLE_BOLETA 
+                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
+                                     AND Ciclo = @ciclo AND NombreMateria = @materia";
 
-                SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                da.SelectCommand.Parameters.AddWithValue("@boleta", boleta);
-                da.SelectCommand.Parameters.AddWithValue("@grupo", grupo);
-                da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
-                da.SelectCommand.Parameters.AddWithValue("@ciclo", ciclo);
-                da.SelectCommand.Parameters.AddWithValue("@materia", materia);
-                da.Fill(dt);
+                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
+                    da.SelectCommand.Parameters.AddWithValue("@boleta", boleta);
+                    da.SelectCommand.Parameters.AddWithValue("@grupo", grupo);
+                    da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
+                    da.SelectCommand.Parameters.AddWithValue("@ciclo", ciclo);
+                    da.SelectCommand.Parameters.AddWithValue("@materia", materia);
+                    da.Fill(dt);
+                }
+            }
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "Acceso denegado a la calificación.";
             }
             return View(dt);
         }
@@ -80,23 +109,31 @@ namespace ProyectoNonato.Controllers
         // 5. ELIMINAR REGISTRO
         public IActionResult Delete(int boleta, string grupo, string nivel, string ciclo, string materia)
         {
-            using (SqlConnection cn = new SqlConnection(Conexion.CadenaSQL))
+            try
             {
-                string query = @"DELETE FROM DETALLE_BOLETA 
-                                 WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
-                                 AND Ciclo = @ciclo AND NombreMateria = @materia";
+                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
+                {
+                    string query = @"DELETE FROM DETALLE_BOLETA 
+                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
+                                     AND Ciclo = @ciclo AND NombreMateria = @materia";
 
-                SqlCommand cmd = new SqlCommand(query, cn);
-                cmd.Parameters.AddWithValue("@boleta", boleta);
-                cmd.Parameters.AddWithValue("@grupo", grupo);
-                cmd.Parameters.AddWithValue("@nivel", nivel);
-                cmd.Parameters.AddWithValue("@ciclo", ciclo);
-                cmd.Parameters.AddWithValue("@materia", materia);
+                    SqlCommand cmd = new SqlCommand(query, cn);
+                    cmd.Parameters.AddWithValue("@boleta", boleta);
+                    cmd.Parameters.AddWithValue("@grupo", grupo);
+                    cmd.Parameters.AddWithValue("@nivel", nivel);
+                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
+                    cmd.Parameters.AddWithValue("@materia", materia);
 
-                cn.Open();
-                cmd.ExecuteNonQuery();
+                    cn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                return RedirectToAction("Index");
             }
-            return RedirectToAction("Index");
+            catch (SqlException ex)
+            {
+                ViewBag.Error = "No tiene permisos para eliminar la calificación.";
+                return RedirectToAction("Index");
+            }
         }
     }
 }
