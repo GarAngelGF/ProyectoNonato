@@ -1,24 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using ProyectoNonato.Utilidades;
-using System;
 
 namespace ProyectoNonato.Controllers
 {
-    // Restricción: Solo el Administrador puede ver y gestionar las boletas
-    [Authorize(Roles = "Admin")]
     public class BoletasController : Controller
     {
         private string GetConnectionString()
         {
-            var user = User.Identity?.Name ?? "";
-            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
-            return Conexion.GenerarCadenaDinamica(user, pass);
+            var builder = new SqlConnectionStringBuilder(Conexion.CadenaSQLBase);
+            var claimsIdentity = User.Identity as System.Security.Claims.ClaimsIdentity;
+            var userIdClaim = claimsIdentity?.FindFirst("DbUser");
+            var passwordClaim = claimsIdentity?.FindFirst("DbPassword");
+
+            if (userIdClaim != null && passwordClaim != null)
+            {
+                builder.UserID = userIdClaim.Value;
+                builder.Password = passwordClaim.Value;
+            }
+            return builder.ConnectionString;
         }
 
-        // 1. VISTA PRINCIPAL (LISTADO)
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
@@ -26,115 +29,85 @@ namespace ProyectoNonato.Controllers
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    // Unimos con ALUMNOS para mostrar el nombre completo del estudiante en la tabla
-                    string query = @"SELECT B.*, A.Nombre + ' ' + A.ApellidoPaterno AS NombreAlumno 
-                                     FROM BOLETAS B 
-                                     JOIN ALUMNOS A ON B.Boleta = A.Boleta";
-
+                    string query = "SELECT * FROM BOLETAS";
                     SqlDataAdapter da = new SqlDataAdapter(query, cn);
                     da.Fill(dt);
                 }
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "Acceso denegado a la información de boletas. Verifique sus permisos.";
+                ViewBag.Error = "Acceso denegado: Tu rol actual no tiene permisos para ver las boletas de calificaciones.";
             }
             return View(dt);
         }
 
-        // 2. CREAR BOLETA (GET)
         public IActionResult Create()
         {
             return View();
         }
 
-        // 3. CREAR BOLETA (POST)
         [HttpPost]
-        public IActionResult Create(int boleta, string nombreGrupo, string nivel, string ciclo, DateTime fechaEmision, string observaciones, decimal promedio, int faltas)
+        public IActionResult Create(int idBoleta, string periodo, int boletaAlumno)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = @"INSERT INTO BOLETAS (Boleta, NombreGrupo, Nivel, Ciclo, FechaEmision, ObservacionesGenerales, PromedioGeneral, Faltas) 
-                                     VALUES (@boleta, @nombreGrupo, @nivel, @ciclo, @fechaEmision, @observaciones, @promedio, @faltas)";
-
+                    string query = @"INSERT INTO BOLETAS (ID_Boleta, Periodo, Boleta) 
+                                     VALUES (@id, @periodo, @boleta)";
                     SqlCommand cmd = new SqlCommand(query, cn);
-                    cmd.Parameters.AddWithValue("@boleta", boleta);
-                    cmd.Parameters.AddWithValue("@nombreGrupo", nombreGrupo);
-                    cmd.Parameters.AddWithValue("@nivel", nivel);
-                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
-
-                    // Manejo de nulos si las fechas u observaciones no son obligatorias
-                    cmd.Parameters.AddWithValue("@fechaEmision", fechaEmision == default(DateTime) ? DBNull.Value : (object)fechaEmision);
-                    cmd.Parameters.AddWithValue("@observaciones", string.IsNullOrEmpty(observaciones) ? DBNull.Value : (object)observaciones);
-                    cmd.Parameters.AddWithValue("@promedio", promedio);
-                    cmd.Parameters.AddWithValue("@faltas", faltas);
-
+                    cmd.Parameters.AddWithValue("@id", idBoleta);
+                    cmd.Parameters.AddWithValue("@periodo", periodo);
+                    cmd.Parameters.AddWithValue("@boleta", boletaAlumno);
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para crear boletas.";
+                ViewBag.Error = "Acceso denegado: No tienes permisos para generar boletas.";
                 return View();
             }
         }
 
-        // 4. ACTUALIZAR BOLETA (GET)
-        // Se requieren los 4 campos de la llave primaria compuesta para encontrar el registro exacto
-        public IActionResult Update(int boleta, string grupo, string nivel, string ciclo)
+        public IActionResult Update(int id)
         {
             DataTable dt = new DataTable();
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = @"SELECT * FROM BOLETAS 
-                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel AND Ciclo = @ciclo";
-
+                    string query = "SELECT * FROM BOLETAS WHERE ID_Boleta = @id";
                     SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                    da.SelectCommand.Parameters.AddWithValue("@boleta", boleta);
-                    da.SelectCommand.Parameters.AddWithValue("@grupo", grupo);
-                    da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
-                    da.SelectCommand.Parameters.AddWithValue("@ciclo", ciclo);
+                    da.SelectCommand.Parameters.AddWithValue("@id", id);
                     da.Fill(dt);
                 }
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
                 ViewBag.Error = "Acceso denegado a la información de la boleta.";
             }
             return View(dt);
         }
 
-        // 5. ELIMINAR BOLETA
-        // Al igual que el Update, el Delete necesita la llave primaria compuesta completa
-        public IActionResult Delete(int boleta, string grupo, string nivel, string ciclo)
+        public IActionResult Delete(int id)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = @"DELETE FROM BOLETAS 
-                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel AND Ciclo = @ciclo";
-
+                    string query = "DELETE FROM BOLETAS WHERE ID_Boleta = @id";
                     SqlCommand cmd = new SqlCommand(query, cn);
-                    cmd.Parameters.AddWithValue("@boleta", boleta);
-                    cmd.Parameters.AddWithValue("@grupo", grupo);
-                    cmd.Parameters.AddWithValue("@nivel", nivel);
-                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
-
+                    cmd.Parameters.AddWithValue("@id", id);
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para eliminar boletas.";
+                ViewBag.Error = "Acceso denegado: No tienes permisos para eliminar boletas.";
                 return RedirectToAction("Index");
             }
         }

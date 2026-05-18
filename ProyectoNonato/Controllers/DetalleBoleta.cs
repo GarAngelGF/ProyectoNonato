@@ -1,24 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using ProyectoNonato.Utilidades;
-using System;
 
 namespace ProyectoNonato.Controllers
 {
-    // Solo el Administrador tiene permiso para gestionar las calificaciones detalladas
-    [Authorize(Roles = "Admin")]
     public class DetalleBoletaController : Controller
     {
         private string GetConnectionString()
         {
-            var user = User.Identity?.Name ?? "";
-            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
-            return Conexion.GenerarCadenaDinamica(user, pass);
+            var builder = new SqlConnectionStringBuilder(Conexion.CadenaSQLBase);
+            var claimsIdentity = User.Identity as System.Security.Claims.ClaimsIdentity;
+            var userIdClaim = claimsIdentity?.FindFirst("DbUser");
+            var passwordClaim = claimsIdentity?.FindFirst("DbPassword");
+
+            if (userIdClaim != null && passwordClaim != null)
+            {
+                builder.UserID = userIdClaim.Value;
+                builder.Password = passwordClaim.Value;
+            }
+            return builder.ConnectionString;
         }
 
-        // 1. LISTADO GENERAL
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
@@ -26,112 +29,66 @@ namespace ProyectoNonato.Controllers
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    // Consulta que trae el detalle y el nombre de la materia para mejor visualización
                     string query = "SELECT * FROM DETALLE_BOLETA";
                     SqlDataAdapter da = new SqlDataAdapter(query, cn);
                     da.Fill(dt);
                 }
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "Acceso denegado a la información de detalle de boletas. Verifique sus permisos.";
+                ViewBag.Error = "Acceso denegado: Tu rol actual no tiene permisos para ver el desglose de calificaciones.";
             }
             return View(dt);
         }
 
-        // 2. AGREGAR CALIFICACIÓN (GET)
         public IActionResult Create()
         {
             return View();
         }
 
-        // 3. AGREGAR CALIFICACIÓN (POST)
         [HttpPost]
-        public IActionResult Create(int boleta, string nombreGrupo, string nivel, string ciclo, string nombreMateria, decimal calificacion, string observaciones)
+        public IActionResult Create(int idBoleta, string nombreMateria, decimal calificacion)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = @"INSERT INTO DETALLE_BOLETA (Boleta, NombreGrupo, Nivel, Ciclo, NombreMateria, Calificacion, ObservacionesMateria) 
-                                     VALUES (@boleta, @grupo, @nivel, @ciclo, @materia, @calif, @obs)";
-
+                    string query = @"INSERT INTO DETALLE_BOLETA (ID_Boleta, NombreMateria, Calificacion) 
+                                     VALUES (@id, @materia, @calif)";
                     SqlCommand cmd = new SqlCommand(query, cn);
-                    cmd.Parameters.AddWithValue("@boleta", boleta);
-                    cmd.Parameters.AddWithValue("@grupo", nombreGrupo);
-                    cmd.Parameters.AddWithValue("@nivel", nivel);
-                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
+                    cmd.Parameters.AddWithValue("@id", idBoleta);
                     cmd.Parameters.AddWithValue("@materia", nombreMateria);
                     cmd.Parameters.AddWithValue("@calif", calificacion);
-                    cmd.Parameters.AddWithValue("@obs", string.IsNullOrEmpty(observaciones) ? DBNull.Value : (object)observaciones);
-
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para crear calificaciones.";
+                ViewBag.Error = "Acceso denegado: No tienes permisos para asentar calificaciones.";
                 return View();
             }
         }
 
-        // 4. ACTUALIZAR CALIFICACIÓN (GET)
-        // Se requieren los 5 parámetros de la PK compuesta para identificar la calificación única
-        public IActionResult Update(int boleta, string grupo, string nivel, string ciclo, string materia)
-        {
-            DataTable dt = new DataTable();
-            try
-            {
-                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
-                {
-                    string query = @"SELECT * FROM DETALLE_BOLETA 
-                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
-                                     AND Ciclo = @ciclo AND NombreMateria = @materia";
-
-                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                    da.SelectCommand.Parameters.AddWithValue("@boleta", boleta);
-                    da.SelectCommand.Parameters.AddWithValue("@grupo", grupo);
-                    da.SelectCommand.Parameters.AddWithValue("@nivel", nivel);
-                    da.SelectCommand.Parameters.AddWithValue("@ciclo", ciclo);
-                    da.SelectCommand.Parameters.AddWithValue("@materia", materia);
-                    da.Fill(dt);
-                }
-            }
-            catch (SqlException ex)
-            {
-                ViewBag.Error = "Acceso denegado a la calificación.";
-            }
-            return View(dt);
-        }
-
-        // 5. ELIMINAR REGISTRO
-        public IActionResult Delete(int boleta, string grupo, string nivel, string ciclo, string materia)
+        public IActionResult Delete(int idBoleta, string nombreMateria)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = @"DELETE FROM DETALLE_BOLETA 
-                                     WHERE Boleta = @boleta AND NombreGrupo = @grupo AND Nivel = @nivel 
-                                     AND Ciclo = @ciclo AND NombreMateria = @materia";
-
+                    string query = "DELETE FROM DETALLE_BOLETA WHERE ID_Boleta = @id AND NombreMateria = @materia";
                     SqlCommand cmd = new SqlCommand(query, cn);
-                    cmd.Parameters.AddWithValue("@boleta", boleta);
-                    cmd.Parameters.AddWithValue("@grupo", grupo);
-                    cmd.Parameters.AddWithValue("@nivel", nivel);
-                    cmd.Parameters.AddWithValue("@ciclo", ciclo);
-                    cmd.Parameters.AddWithValue("@materia", materia);
-
+                    cmd.Parameters.AddWithValue("@id", idBoleta);
+                    cmd.Parameters.AddWithValue("@materia", nombreMateria);
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para eliminar la calificación.";
+                ViewBag.Error = "Acceso denegado: No tienes permisos para eliminar calificaciones.";
                 return RedirectToAction("Index");
             }
         }

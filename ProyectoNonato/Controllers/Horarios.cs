@@ -1,24 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using ProyectoNonato.Utilidades;
-using System;
 
 namespace ProyectoNonato.Controllers
 {
-    // Restricción: Solo el Administrador puede gestionar la infraestructura de horarios
-    [Authorize(Roles = "Admin")]
     public class HorariosController : Controller
     {
         private string GetConnectionString()
         {
-            var user = User.Identity?.Name ?? "";
-            var pass = User.Claims.FirstOrDefault(c => c.Type == "UserPass")?.Value ?? "";
-            return Conexion.GenerarCadenaDinamica(user, pass);
+            var builder = new SqlConnectionStringBuilder(Conexion.CadenaSQLBase);
+            var claimsIdentity = User.Identity as System.Security.Claims.ClaimsIdentity;
+            var userIdClaim = claimsIdentity?.FindFirst("DbUser");
+            var passwordClaim = claimsIdentity?.FindFirst("DbPassword");
+
+            if (userIdClaim != null && passwordClaim != null)
+            {
+                builder.UserID = userIdClaim.Value;
+                builder.Password = passwordClaim.Value;
+            }
+            return builder.ConnectionString;
         }
 
-        // 1. LISTADO GENERAL DE HORARIOS
         public IActionResult Index()
         {
             DataTable dt = new DataTable();
@@ -26,106 +29,75 @@ namespace ProyectoNonato.Controllers
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    // Consulta que une tablas para mostrar nombres en lugar de solo IDs/Cédulas
-                    string query = @"SELECT H.*, M.NombreMateria, P.Nombre + ' ' + P.ApellidoPaterno AS Profesor
-                                     FROM HORARIOS H
-                                     JOIN MATERIAS M ON H.NombreMateria = M.NombreMateria
-                                     JOIN PROFESORES P ON H.CedulaProfesional = P.CedulaProfesional";
-
+                    string query = "SELECT * FROM HORARIOS";
                     SqlDataAdapter da = new SqlDataAdapter(query, cn);
                     da.Fill(dt);
                 }
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "Acceso denegado a la información de horarios. Verifique sus permisos.";
+                ViewBag.Error = "Acceso denegado: Tu rol actual no tiene permisos para ver la planeación de horarios.";
             }
             return View(dt);
         }
 
-        // 2. CREAR HORARIO (GET)
         public IActionResult Create()
         {
             return View();
         }
 
-        // 3. CREAR HORARIO (POST)
         [HttpPost]
-        public IActionResult Create(string dia, TimeSpan horaInicio, TimeSpan horaFin, string edificio, string aula, string grupo, string nivel, string materia, string cedula)
+        public IActionResult Create(string dia, string horaInicio, string horaFin, string edificio, string aula, string nombreGrupo, string nivel, string nombreMateria, string cedulaProfesional)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
                     string query = @"INSERT INTO HORARIOS (Dia, HoraInicio, HoraFin, Edificio, Aula, NombreGrupo, Nivel, NombreMateria, CedulaProfesional) 
-                                     VALUES (@dia, @inicio, @fin, @edificio, @aula, @grupo, @nivel, @materia, @cedula)";
-
+                                     VALUES (@dia, @inicio, @fin, @edif, @aula, @grupo, @nivel, @materia, @cedula)";
                     SqlCommand cmd = new SqlCommand(query, cn);
                     cmd.Parameters.AddWithValue("@dia", dia);
                     cmd.Parameters.AddWithValue("@inicio", horaInicio);
                     cmd.Parameters.AddWithValue("@fin", horaFin);
-                    cmd.Parameters.AddWithValue("@edificio", edificio);
-                    cmd.Parameters.AddWithValue("@aula", aula);
-                    cmd.Parameters.AddWithValue("@grupo", grupo);
+                    cmd.Parameters.AddWithValue("@edif", string.IsNullOrEmpty(edificio) ? DBNull.Value : (object)edificio);
+                    cmd.Parameters.AddWithValue("@aula", string.IsNullOrEmpty(aula) ? DBNull.Value : (object)aula);
+                    cmd.Parameters.AddWithValue("@grupo", nombreGrupo);
                     cmd.Parameters.AddWithValue("@nivel", nivel);
-                    cmd.Parameters.AddWithValue("@materia", materia);
-                    cmd.Parameters.AddWithValue("@cedula", cedula);
-
+                    cmd.Parameters.AddWithValue("@materia", nombreMateria);
+                    cmd.Parameters.AddWithValue("@cedula", cedulaProfesional);
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para crear horarios.";
+                ViewBag.Error = "Acceso denegado: No tienes privilegios para agendar horarios.";
                 return View();
             }
         }
 
-        // 4. ACTUALIZAR HORARIO (GET)
-        // Se utiliza la llave primaria compuesta (Dia y HoraInicio)
-        public IActionResult Update(string dia, TimeSpan inicio)
-        {
-            DataTable dt = new DataTable();
-            try
-            {
-                using (SqlConnection cn = new SqlConnection(GetConnectionString()))
-                {
-                    string query = "SELECT * FROM HORARIOS WHERE Dia = @dia AND HoraInicio = @inicio";
-                    SqlDataAdapter da = new SqlDataAdapter(query, cn);
-                    da.SelectCommand.Parameters.AddWithValue("@dia", dia);
-                    da.SelectCommand.Parameters.AddWithValue("@inicio", inicio);
-                    da.Fill(dt);
-                }
-            }
-            catch (SqlException ex)
-            {
-                ViewBag.Error = "Acceso denegado al horario.";
-            }
-            return View(dt);
-        }
-
-        // 5. ELIMINAR HORARIO
-        public IActionResult Delete(string dia, TimeSpan inicio)
+        public IActionResult Delete(string dia, string horaInicio, string nombreGrupo, string nivel, string nombreMateria)
         {
             try
             {
                 using (SqlConnection cn = new SqlConnection(GetConnectionString()))
                 {
-                    string query = "DELETE FROM HORARIOS WHERE Dia = @dia AND HoraInicio = @inicio";
+                    string query = "DELETE FROM HORARIOS WHERE Dia = @dia AND HoraInicio = @inicio AND NombreGrupo = @grupo AND Nivel = @nivel AND NombreMateria = @materia";
                     SqlCommand cmd = new SqlCommand(query, cn);
                     cmd.Parameters.AddWithValue("@dia", dia);
-                    cmd.Parameters.AddWithValue("@inicio", inicio);
-
+                    cmd.Parameters.AddWithValue("@inicio", horaInicio);
+                    cmd.Parameters.AddWithValue("@grupo", nombreGrupo);
+                    cmd.Parameters.AddWithValue("@nivel", nivel);
+                    cmd.Parameters.AddWithValue("@materia", nombreMateria);
                     cn.Open();
                     cmd.ExecuteNonQuery();
                 }
                 return RedirectToAction("Index");
             }
-            catch (SqlException ex)
+            catch (SqlException)
             {
-                ViewBag.Error = "No tiene permisos para eliminar horarios.";
+                ViewBag.Error = "Acceso denegado: No tienes privilegios para eliminar horarios.";
                 return RedirectToAction("Index");
             }
         }
